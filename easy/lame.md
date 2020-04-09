@@ -100,6 +100,7 @@ msf5 exploit(unix/ftp/vsftpd_234_backdoor) > exploit
 In this case, it doesn't.
 
 ## SSH
+Without a username at least there isn't much we can do with SSH for now, we do have the version of OpenSSH it's using but there are no vulnerabilities we're able to exploit at this stage.
 
 ## SMB
 
