@@ -1,2 +1,2 @@
 # htb-writeups
-Writeups for HackTheBox machines
+Writeups for [HackTheBox](https://www.hackthebox.eu/) machines
