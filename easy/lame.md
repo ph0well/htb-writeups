@@ -39,8 +39,28 @@ Host script results:
 ```
 
 ## FTP
+The ftp service on this box has anonymous login enabled which allows us to connect without authenticating
 
-## ssh
+Unfortunately there are no files on the ftp server for us to look at.
+```sh
+root@kali:~# ftp 10.10.10.3
+Connected to 10.10.10.3.
+220 (vsFTPd 2.3.4)
+Name (10.10.10.3:root): anonymous
+331 Please specify the password.
+Password:
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> ls
+200 PORT command successful. Consider using PASV.
+150 Here comes the directory listing.
+226 Directory send OK.
+ftp> 
+```
+We can also find out whether the version of vsftpd running on the server is vulnerable
+
+## SSH
 
 ## SMB
 
